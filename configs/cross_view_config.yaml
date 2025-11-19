@@ -120,7 +120,9 @@ BACKBONE:
 ADJUST:
   ADJUST: True
   TYPE: "AdjustAllLayer"
-  KWARGS: {}
+  KWARGS:
+    in_channels: [512, 1024, 2048]  # ResNet-50: p2, p3, p4 channels
+    out_channels: [256, 256, 256]   # Adjust all to 256
 
 # ------------------------------------------------------------------------ #
 # RPN options

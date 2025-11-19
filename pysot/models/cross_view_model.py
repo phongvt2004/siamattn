@@ -40,8 +40,29 @@ class CrossViewModelBuilder(nn.Module):
 
         # build adjust layer
         if cfg.ADJUST.ADJUST:
-            self.neck = get_neck(cfg.ADJUST.TYPE,
-                                 **cfg.ADJUST.KWARGS)
+            # Get in_channels and out_channels from config or use defaults
+            # AdjustAllLayer needs: in_channels (list) and out_channels (list)
+            # ResNet-50 output: [x_(64), p1(256), p2(512), p3(1024), p4(2048)] for used_layers=[0,1,2,3,4]
+            # Neck processes zf[2:], so we need channels for layers from index 2 onwards
+            adjust_kwargs = {}
+            if hasattr(cfg.ADJUST.KWARGS, '__dict__'):
+                adjust_kwargs = dict(cfg.ADJUST.KWARGS)
+            elif isinstance(cfg.ADJUST.KWARGS, dict):
+                adjust_kwargs = cfg.ADJUST.KWARGS.copy()
+            
+            # Default values based on ResNet-50
+            # For used_layers=[0,1,2,3,4], zf[2:] = [p2(512), p3(1024), p4(2048)]
+            # Adjust all to 256
+            if 'in_channels' not in adjust_kwargs:
+                # ResNet-50 channel sizes: [64, 256, 512, 1024, 2048] for [x_, p1, p2, p3, p4]
+                # Neck processes from index 2, so [512, 1024, 2048]
+                adjust_kwargs['in_channels'] = [512, 1024, 2048]
+            if 'out_channels' not in adjust_kwargs:
+                # Default: adjust all to 256
+                num_layers = len(adjust_kwargs.get('in_channels', [512, 1024, 2048]))
+                adjust_kwargs['out_channels'] = [256] * num_layers
+            
+            self.neck = get_neck(cfg.ADJUST.TYPE, **adjust_kwargs)
 
         # build multi-template fusion
         fusion_method = getattr(cfg.MODEL, 'FUSION_METHOD', fusion_method) if hasattr(cfg, 'MODEL') else fusion_method
