@@ -31,6 +31,9 @@ fi
 # Set CUDA visible devices
 export CUDA_VISIBLE_DEVICES=$GPU_IDS
 
+# Add current directory to PYTHONPATH
+export PYTHONPATH="${PYTHONPATH}:$(pwd)"
+
 # Run training
 python tools/train_cross_view.py \
     --cfg $CONFIG_FILE \

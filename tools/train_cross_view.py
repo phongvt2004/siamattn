@@ -8,11 +8,18 @@ from __future__ import unicode_literals
 import argparse
 import logging
 import os
+import sys
 import time
 import math
 import json
 import random
 import numpy as np
+
+# Add parent directory to path to import pysot
+cur_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(cur_dir)
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
 
 import torch
 import torch.nn as nn
