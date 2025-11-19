@@ -92,9 +92,12 @@ class CrossViewModelBuilder(nn.Module):
         
         self.rpn_head = get_rpn_head(cfg.RPN.TYPE, **rpn_kwargs)
 
-        # build mask head
+        # FeatureEnhance is part of the main architecture (not just for mask)
+        # It applies deformable attention to enhance features before RPN
+        self.feature_enhance = FeatureEnhance(in_channels=256, out_channels=256)
+
+        # build mask head (only if MASK is enabled)
         if cfg.MASK.MASK:
-            self.feature_enhance = FeatureEnhance(in_channels=256, out_channels=256)
             self.feature_fusion = FeatureFusionNeck(num_ins=5, fusion_level=1,
                                                     in_channels=[64, 256, 256, 256, 256], conv_out_channels=256)
             self.mask_head = FusedSemanticHead(pooling_func=None,
