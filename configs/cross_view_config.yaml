@@ -129,7 +129,10 @@ ADJUST:
 # ------------------------------------------------------------------------ #
 RPN:
   TYPE: 'MultiRPN'
-  KWARGS: {}
+  KWARGS:
+    anchor_num: 5  # From ANCHOR.ANCHOR_NUM (len(RATIOS) * len(SCALES))
+    in_channels: [256, 256, 256]  # Channels after neck adjustment for layers 2,3,4
+    weighted: False  # Optional: use weighted fusion
 
 # ------------------------------------------------------------------------ #
 # Mask options

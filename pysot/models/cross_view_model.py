@@ -75,8 +75,22 @@ class CrossViewModelBuilder(nn.Module):
         )
 
         # build rpn head
-        self.rpn_head = get_rpn_head(cfg.RPN.TYPE,
-                                     **cfg.RPN.KWARGS)
+        # Get anchor_num and in_channels from config or use defaults
+        rpn_kwargs = {}
+        if hasattr(cfg.RPN.KWARGS, '__dict__'):
+            rpn_kwargs = dict(cfg.RPN.KWARGS)
+        elif isinstance(cfg.RPN.KWARGS, dict):
+            rpn_kwargs = cfg.RPN.KWARGS.copy()
+        
+        # Default values
+        if 'anchor_num' not in rpn_kwargs:
+            rpn_kwargs['anchor_num'] = cfg.ANCHOR.ANCHOR_NUM
+        if 'in_channels' not in rpn_kwargs:
+            # MultiRPN needs list of in_channels for each layer
+            # Based on neck output: [256, 256, 256] for layers 2,3,4
+            rpn_kwargs['in_channels'] = [256, 256, 256]
+        
+        self.rpn_head = get_rpn_head(cfg.RPN.TYPE, **rpn_kwargs)
 
         # build mask head
         if cfg.MASK.MASK:
