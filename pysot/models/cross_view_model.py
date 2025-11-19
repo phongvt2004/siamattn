@@ -113,16 +113,16 @@ class CrossViewModelBuilder(nn.Module):
             # Extract features for each template
             zf_list = []
             for z in z_list:
-            zf = self.backbone(z)
-            if cfg.ADJUST.ADJUST:
-                # Adjust neck for levels 2,3,4
-                zf_adjusted = self.neck(zf[2:])
-                # Reconstruct full feature list
-                if isinstance(zf, (list, tuple)):
-                    zf = list(zf[:2]) + list(zf_adjusted)
-                else:
-                    zf = [zf] + list(zf_adjusted) if isinstance(zf_adjusted, (list, tuple)) else [zf, zf_adjusted]
-            zf_list.append(zf)
+                zf = self.backbone(z)
+                if cfg.ADJUST.ADJUST:
+                    # Adjust neck for levels 2,3,4
+                    zf_adjusted = self.neck(zf[2:])
+                    # Reconstruct full feature list
+                    if isinstance(zf, (list, tuple)):
+                        zf = list(zf[:2]) + list(zf_adjusted)
+                    else:
+                        zf = [zf] + list(zf_adjusted) if isinstance(zf_adjusted, (list, tuple)) else [zf, zf_adjusted]
+                zf_list.append(zf)
             
             # Fuse templates
             zf_fused = self.multi_template_fusion(zf_list)
