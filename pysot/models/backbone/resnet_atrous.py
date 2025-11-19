@@ -204,7 +204,8 @@ def resnet18(**kwargs):
     """Constructs a ResNet-18 model.
 
     """
-    model = ResNet(BasicBlock, [2, 2, 2, 2], **kwargs)
+    used_layers = kwargs.pop('used_layers', [2, 3, 4])  # Default: use p2, p3, p4
+    model = ResNet(BasicBlock, [2, 2, 2, 2], used_layers, **kwargs)
     return model
 
 
@@ -212,7 +213,8 @@ def resnet34(**kwargs):
     """Constructs a ResNet-34 model.
 
     """
-    model = ResNet(BasicBlock, [3, 4, 6, 3], **kwargs)
+    used_layers = kwargs.pop('used_layers', [2, 3, 4])  # Default: use p2, p3, p4
+    model = ResNet(BasicBlock, [3, 4, 6, 3], used_layers, **kwargs)
     return model
 
 
@@ -220,7 +222,8 @@ def resnet50(**kwargs):
     """Constructs a ResNet-50 model.
 
     """
-    model = ResNet(Bottleneck, [3, 4, 6, 3], **kwargs)
+    used_layers = kwargs.pop('used_layers', [2, 3, 4])  # Default: use p2, p3, p4
+    model = ResNet(Bottleneck, [3, 4, 6, 3], used_layers, **kwargs)
     return model
 
 

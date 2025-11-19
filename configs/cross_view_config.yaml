@@ -107,7 +107,8 @@ MODEL:
 # ------------------------------------------------------------------------ #
 BACKBONE:
   TYPE: 'resnet50'
-  KWARGS: {}
+  KWARGS:
+    used_layers: [0, 1, 2, 3, 4]  # [x_, p1, p2, p3, p4] - all layers
   PRETRAINED: 'pretrained_models/resnet50.model'  # Path to pretrained ResNet-50
   TRAIN_LAYERS: ['layer2', 'layer3', 'layer4']
   LAYERS_LR: 0.1
