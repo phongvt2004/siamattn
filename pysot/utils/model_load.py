@@ -44,9 +44,8 @@ def remove_prefix(state_dict, prefix):
 
 def load_pretrain(model, pretrained_path):
     logger.info('load pretrained model from {}'.format(pretrained_path))
-    device = torch.cuda.current_device()
-    pretrained_dict = torch.load(pretrained_path,
-        map_location=lambda storage, loc: storage.cuda(device))
+    # Load on CPU first to avoid device mismatch, then move to model's device
+    pretrained_dict = torch.load(pretrained_path, map_location='cpu', weights_only=False)
     if "state_dict" in pretrained_dict.keys():
         pretrained_dict = remove_prefix(pretrained_dict['state_dict'],
                                         'module.')
@@ -64,14 +63,19 @@ def load_pretrain(model, pretrained_path):
             new_dict[k] = v
         pretrained_dict = new_dict
         check_keys(model, pretrained_dict)
+    
+    # Move pretrained_dict to model's device
+    model_device = next(model.parameters()).device
+    pretrained_dict = {k: v.to(model_device) if isinstance(v, torch.Tensor) else v 
+                       for k, v in pretrained_dict.items()}
+    
     model.load_state_dict(pretrained_dict, strict=False)
     return model
 
 
 def restore_from(model, optimizer, ckpt_path):
-    device = torch.cuda.current_device()
-    ckpt = torch.load(ckpt_path,
-        map_location=lambda storage, loc: storage.cuda(device))
+    # Load on CPU first to avoid device mismatch
+    ckpt = torch.load(ckpt_path, map_location='cpu', weights_only=False)
 
     ckpt_model_dict = remove_prefix(ckpt['state_dict'], 'module.')
     check_keys(model, ckpt_model_dict)
@@ -82,9 +86,8 @@ def restore_from(model, optimizer, ckpt_path):
     return model, optimizer
 
 def restore_epoch(ckpt_path):
-    device = torch.cuda.current_device()
-    ckpt = torch.load(ckpt_path,
-                      map_location=lambda storage, loc: storage.cuda(device))
+    # Load on CPU first
+    ckpt = torch.load(ckpt_path, map_location='cpu', weights_only=False)
     epoch = ckpt['epoch']
 
     return epoch
