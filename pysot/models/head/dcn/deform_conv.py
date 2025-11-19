@@ -65,6 +65,13 @@ class DeformConvFunction(Function):
         if not grad_output.is_cuda:
             raise NotImplementedError
         else:
+            # Ensure all tensors are contiguous before backward pass
+            # This fixes "view size is not compatible" errors
+            input = input.contiguous()
+            offset = offset.contiguous()
+            weight = weight.contiguous()
+            grad_output = grad_output.contiguous()
+            
             cur_im2col_step = min(ctx.im2col_step, input.shape[0])
             assert (input.shape[0] %
                     cur_im2col_step) == 0, 'im2col step must divide batchsize'
@@ -153,11 +160,21 @@ class ModulatedDeformConvFunction(Function):
         if not grad_output.is_cuda:
             raise NotImplementedError
         input, offset, mask, weight, bias = ctx.saved_tensors
+        
+        # Ensure all tensors are contiguous before backward pass
+        input = input.contiguous()
+        offset = offset.contiguous()
+        mask = mask.contiguous()
+        weight = weight.contiguous()
+        grad_output = grad_output.contiguous()
+        if bias is not None:
+            bias = bias.contiguous()
+        
         grad_input = torch.zeros_like(input)
         grad_offset = torch.zeros_like(offset)
         grad_mask = torch.zeros_like(mask)
         grad_weight = torch.zeros_like(weight)
-        grad_bias = torch.zeros_like(bias)
+        grad_bias = torch.zeros_like(bias) if bias is not None else None
         deform_conv_cuda.modulated_deform_conv_cuda_backward(
             input, weight, bias, ctx._bufs[0], offset, mask, ctx._bufs[1],
             grad_input, grad_weight, grad_bias, grad_offset, grad_mask,
