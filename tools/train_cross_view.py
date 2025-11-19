@@ -21,6 +21,44 @@ parent_dir = os.path.dirname(cur_dir)
 if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 
+# Check and build DCN extensions if needed
+def check_and_build_dcn():
+    """Check if DCN extensions are built, if not, build them"""
+    dcn_dir = os.path.join(parent_dir, 'pysot', 'models', 'head', 'dcn')
+    try:
+        # Try to import to check if built
+        import importlib.util
+        spec = importlib.util.find_spec('pysot.models.head.dcn.deform_conv_cuda')
+        if spec is None:
+            raise ImportError("DCN extensions not found")
+    except (ImportError, AttributeError):
+        # DCN extensions not built, try to build them
+        print("⚠ DCN extensions not found, attempting to build...")
+        setup_file = os.path.join(dcn_dir, 'setup.py')
+        if os.path.exists(setup_file):
+            import subprocess
+            try:
+                result = subprocess.run(
+                    ['python', 'setup.py', 'build_ext', '--inplace'],
+                    cwd=dcn_dir,
+                    capture_output=True,
+                    text=True,
+                    timeout=300  # 5 minutes timeout
+                )
+                if result.returncode == 0:
+                    print("✓ DCN extensions built successfully")
+                else:
+                    print(f"✗ DCN extensions build failed: {result.stderr}")
+                    raise RuntimeError("Failed to build DCN extensions. Please build manually.")
+            except subprocess.TimeoutExpired:
+                print("✗ DCN extensions build timed out")
+                raise RuntimeError("DCN extensions build timed out")
+            except Exception as e:
+                print(f"✗ Error building DCN extensions: {e}")
+                raise RuntimeError(f"Failed to build DCN extensions: {e}")
+        else:
+            raise RuntimeError(f"DCN setup.py not found at {setup_file}")
+
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
@@ -41,6 +79,18 @@ from pysot.core.config import cfg
 
 
 logger = logging.getLogger('global')
+
+# Check DCN extensions before parsing args (so we can fail early)
+try:
+    check_and_build_dcn()
+except Exception as e:
+    # If in non-interactive mode, try to continue anyway
+    import sys
+    if '--skip-dcn-check' not in sys.argv:
+        print(f"Error: {e}")
+        print("You can skip this check with --skip-dcn-check (not recommended)")
+        sys.exit(1)
+
 parser = argparse.ArgumentParser(description='cross-view siamese tracking')
 parser.add_argument('--cfg', type=str, default='configs/cross_view_config.yaml',
                     help='configuration of tracking')
@@ -48,6 +98,8 @@ parser.add_argument('--seed', type=int, default=123456,
                     help='random seed')
 parser.add_argument('--local_rank', type=int, default=0,
                     help='compulsory for pytorch launcer')
+parser.add_argument('--skip-dcn-check', action='store_true',
+                    help='skip DCN extensions check (not recommended)')
 args = parser.parse_args()
 
 

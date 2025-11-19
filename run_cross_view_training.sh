@@ -34,6 +34,19 @@ export CUDA_VISIBLE_DEVICES=$GPU_IDS
 # Add current directory to PYTHONPATH
 export PYTHONPATH="${PYTHONPATH}:$(pwd)"
 
+# Check if DCN extensions are built
+echo "Checking DCN extensions..."
+if python -c "from pysot.models.head.dcn import deform_conv_cuda" 2>/dev/null; then
+    echo "✓ DCN extensions already built"
+else
+    echo "⚠ DCN extensions not found, building now..."
+    if [ -f "build_dcn.sh" ]; then
+        bash build_dcn.sh
+    else
+        cd pysot/models/head/dcn && python setup.py build_ext --inplace && cd ../../../../..
+    fi
+fi
+
 # Run training
 python tools/train_cross_view.py \
     --cfg $CONFIG_FILE \

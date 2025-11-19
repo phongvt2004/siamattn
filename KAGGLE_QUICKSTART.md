@@ -2,10 +2,10 @@
 
 ## Cách chạy training trên Kaggle
 
-### Option 1: Chạy trực tiếp trong Notebook
+### Option 1: Chạy trực tiếp trong Notebook (Khuyến nghị)
 
 ```python
-# Cell 1: Setup environment
+# Cell 1: Setup environment và build DCN extensions
 import os
 import sys
 
@@ -13,15 +13,22 @@ import sys
 if '/kaggle/working/siamattn' not in sys.path:
     sys.path.insert(0, '/kaggle/working/siamattn')
 
-# Verify imports
+# Build DCN extensions (required for training)
+print("Building DCN extensions...")
+!cd /kaggle/working/siamattn/pysot/models/head/dcn && python setup.py build_ext --inplace
+print("✓ DCN extensions built")
+
+# Cell 2: Verify imports
 try:
     from pysot.core.config import cfg
+    from pysot.models.head.dcn import deform_conv_cuda
     print("✓ pysot imported successfully")
+    print("✓ DCN extensions loaded")
 except ImportError as e:
     print(f"✗ Import error: {e}")
-    print("Make sure you're in the correct directory")
+    print("Make sure DCN extensions are built")
 
-# Cell 2: Run training
+# Cell 3: Run training
 !cd /kaggle/working/siamattn && python tools/train_cross_view.py --cfg configs/cross_view_config.yaml --seed 123456
 ```
 
@@ -79,6 +86,16 @@ python tools/train_cross_view.py --cfg configs/cross_view_config.yaml
 cd /kaggle/working/siamattn
 pip install -e .
 ```
+
+### Lỗi "cannot import name 'deform_conv_cuda'"
+
+**Giải pháp**: Build DCN extensions trước:
+```python
+# Trong Kaggle notebook
+!cd /kaggle/working/siamattn/pysot/models/head/dcn && python setup.py build_ext --inplace
+```
+
+Hoặc script sẽ tự động build (nhưng có thể mất vài phút).
 
 ### Lỗi "Config file not found"
 
