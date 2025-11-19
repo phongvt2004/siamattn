@@ -149,6 +149,87 @@ Model được train theo 3 stages:
 - **Checkpoints**: `./snapshot/cross_view/checkpoint_e{epoch}.pth`
 - **Tensorboard**: Chạy `tensorboard --logdir ./logs/cross_view/`
 
+## Checkpoint và Resume Training
+
+### 1. Resume Training từ Checkpoint
+
+Nếu training bị gián đoạn, bạn có thể resume từ checkpoint:
+
+**Cách 1: Sử dụng config file**
+```yaml
+# Trong configs/cross_view_config.yaml
+TRAIN:
+  RESUME: 'snapshot/cross_view/checkpoint_e10.pth'  # Path to checkpoint
+  START_EPOCH: 10  # Epoch để resume (thường là epoch trong checkpoint)
+```
+
+**Cách 2: Sử dụng pretrained model**
+```yaml
+# Trong configs/cross_view_config.yaml
+TRAIN:
+  PRETRAINED: 'snapshot/cross_view/checkpoint_e20.pth'  # Load weights only
+```
+
+**Cách 3: Command line (nếu script hỗ trợ)**
+```bash
+python tools/train_cross_view.py \
+    --cfg configs/cross_view_config.yaml \
+    --resume snapshot/cross_view/checkpoint_e10.pth
+```
+
+### 2. Load Checkpoint để Inference
+
+```python
+import torch
+from pysot.models.cross_view_model import CrossViewModelBuilder
+
+# Load checkpoint
+checkpoint = torch.load('snapshot/cross_view/checkpoint_e50.pth', map_location='cpu')
+
+# Create model
+model = CrossViewModelBuilder(fusion_method='attention')
+
+# Load weights
+model.load_state_dict(checkpoint['state_dict'])
+model.eval()
+
+# Hoặc nếu chỉ có state_dict
+# model.load_state_dict(torch.load('snapshot/cross_view/checkpoint_e50.pth'))
+```
+
+### 3. Checkpoint Structure
+
+Mỗi checkpoint chứa:
+```python
+{
+    'epoch': 10,                    # Epoch number
+    'state_dict': model.state_dict(), # Model weights
+    'optimizer': optimizer.state_dict() # Optimizer state (for resume)
+}
+```
+
+### 4. Best Practices
+
+- **Lưu checkpoint thường xuyên**: Model tự động lưu mỗi epoch
+- **Giữ best checkpoint**: Lưu checkpoint có loss thấp nhất
+- **Resume đúng epoch**: Set `START_EPOCH` đúng với epoch trong checkpoint
+- **Backup checkpoints**: Copy checkpoints quan trọng ra nơi khác
+
+### 5. Ví dụ Resume Training
+
+```yaml
+# configs/cross_view_config.yaml
+TRAIN:
+  RESUME: 'snapshot/cross_view/checkpoint_e25.pth'
+  START_EPOCH: 25
+  EPOCH: 50  # Continue to epoch 50
+```
+
+Khi resume, training sẽ:
+- Load model weights từ checkpoint
+- Load optimizer state (learning rate, momentum, etc.)
+- Tiếp tục từ epoch đã chỉ định
+
 ## Troubleshooting
 
 ### 1. Lỗi "Video not found"
@@ -169,9 +250,45 @@ Model được train theo 3 stages:
 ## Evaluation
 
 Sau khi training, bạn có thể:
-1. Load checkpoint: `torch.load('snapshot/cross_view/checkpoint_e50.pth')`
-2. Sử dụng model để inference trên test data
-3. Evaluate metrics (mAP, Precision@IoU=0.5)
+
+### 1. Load Checkpoint để Evaluation
+
+```python
+import torch
+from pysot.models.cross_view_model import CrossViewModelBuilder
+
+# Load best checkpoint
+checkpoint_path = 'snapshot/cross_view/checkpoint_e50.pth'
+checkpoint = torch.load(checkpoint_path, map_location='cuda:0')
+
+# Create và load model
+model = CrossViewModelBuilder(fusion_method='attention').cuda()
+model.load_state_dict(checkpoint['state_dict'])
+model.eval()
+
+print(f"Loaded checkpoint from epoch {checkpoint['epoch']}")
+```
+
+### 2. Inference với Model
+
+```python
+# Load 3 template images
+templates = [load_image('img_1.jpg'), load_image('img_2.jpg'), load_image('img_3.jpg')]
+search_image = load_drone_frame('frame_100.jpg')
+
+# Set templates
+model.template(templates)
+
+# Track object
+output = model.track(search_image)
+bbox = output['loc']  # Predicted bounding box
+```
+
+### 3. Evaluate Metrics
+
+- **mAP**: Mean Average Precision
+- **Precision@IoU=0.5**: Precision at IoU threshold 0.5
+- **Success Rate**: Percentage of successful detections
 
 ## Ablation Studies
 

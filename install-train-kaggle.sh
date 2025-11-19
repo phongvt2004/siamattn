@@ -96,6 +96,19 @@ echo "=========================================="
 echo "Verifying Python imports..."
 python << EOF
 import sys
+import os
+
+# Add the current directory to Python path so 'pysot' can be imported
+project_path = '/kaggle/working/siamattn'
+if project_path not in sys.path:
+    sys.path.append(project_path)
+
+# Verify it works
+try:
+    import pysot
+    print(f"SUCCESS: pysot imported from {pysot.__file__}")
+except ImportError as e:
+    print(f"ERROR: {e}")
 errors = []
 
 try:

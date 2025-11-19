@@ -200,9 +200,29 @@ Output: Classification + Regression
 
 1. **Run Training**: Bắt đầu training với config mặc định
 2. **Monitor**: Theo dõi logs và tensorboard
-3. **Tune**: Điều chỉnh hyperparameters nếu cần
-4. **Evaluate**: Test model trên validation set
-5. **Ablation**: So sánh các fusion methods
+3. **Save Checkpoints**: Model tự động lưu checkpoint mỗi epoch
+4. **Resume if needed**: Nếu training bị gián đoạn, resume từ checkpoint
+5. **Tune**: Điều chỉnh hyperparameters nếu cần
+6. **Evaluate**: Test model trên validation set
+7. **Ablation**: So sánh các fusion methods
+
+## 💾 Checkpoint Management
+
+### Resume Training
+```yaml
+# configs/cross_view_config.yaml
+TRAIN:
+  RESUME: 'snapshot/cross_view/checkpoint_e10.pth'
+  START_EPOCH: 10
+```
+
+### Load for Inference
+```python
+checkpoint = torch.load('snapshot/cross_view/checkpoint_e50.pth')
+model.load_state_dict(checkpoint['state_dict'])
+```
+
+Xem chi tiết trong `CROSS_VIEW_TRAINING_README.md` section "Checkpoint và Resume Training"
 
 ## 📝 References
 
