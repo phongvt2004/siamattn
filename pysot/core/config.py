@@ -5,7 +5,7 @@ from __future__ import unicode_literals
 
 from yacs.config import CfgNode as CN
 
-__C = CN()
+__C = CN(new_allowed=True)  # Allow new keys for cross-view config
 
 cfg = __C
 
@@ -210,6 +210,12 @@ __C.DATASET.TKN.ANNO = 'training_dataset/trackingnet/train.json'
 __C.DATASET.TKN.FRAME_RANGE = 100
 __C.DATASET.TKN.NUM_USE = 200000
 
+__C.DATASET.OBSERVING = CN()
+__C.DATASET.OBSERVING.ROOT = 'training_dataset/observing/train/samples'
+__C.DATASET.OBSERVING.ANNO = 'training_dataset/observing/train/annotations/annotations.json'
+__C.DATASET.OBSERVING.FRAME_RANGE = 1
+__C.DATASET.OBSERVING.NUM_USE = -1
+
 __C.DATASET.VIDEOS_PER_EPOCH = 600000
 # ------------------------------------------------------------------------ #
 # Backbone options
@@ -270,6 +276,20 @@ __C.MASK.TYPE = "MaskCorr"
 __C.MASK.KWARGS = CN(new_allowed=True)
 
 __C.MASK.MASK_OUTSIZE = 64
+
+# ------------------------------------------------------------------------ #
+# Model options (for cross-view)
+# ------------------------------------------------------------------------ #
+__C.MODEL = CN()
+
+# Multi-template support
+__C.MODEL.MULTI_TEMPLATE = False
+
+# Fusion method for multi-template
+__C.MODEL.FUSION_METHOD = 'attention'
+
+# Number of templates
+__C.MODEL.NUM_TEMPLATES = 3
 
 __C.REFINE = CN()
 

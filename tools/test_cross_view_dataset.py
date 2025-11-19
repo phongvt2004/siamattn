@@ -27,7 +27,21 @@ def test_dataset():
     # Load config
     config_file = 'configs/cross_view_config.yaml'
     if os.path.exists(config_file):
-        cfg.merge_from_file(config_file)
+        try:
+            cfg.merge_from_file(config_file)
+        except KeyError as e:
+            print(f"Warning: Config key error: {e}")
+            print("  Some config keys may not be defined in config.py")
+            print("  Continuing with available config...")
+            # Try to load with new_allowed=True for MODEL
+            if 'MODEL' in str(e):
+                # MODEL config is optional, set defaults
+                if not hasattr(cfg, 'MODEL'):
+                    from yacs.config import CfgNode as CN
+                    cfg.MODEL = CN()
+                    cfg.MODEL.MULTI_TEMPLATE = True
+                    cfg.MODEL.FUSION_METHOD = 'attention'
+                    cfg.MODEL.NUM_TEMPLATES = 3
     else:
         print("Warning: Config file not found, using defaults")
         # Set default values
@@ -65,6 +79,13 @@ def test_dataset():
                 'ANNO': 'training_dataset/observing/train/annotations/annotations.json'
             })()
         })()
+        # Add MODEL defaults
+        from yacs.config import CfgNode as CN
+        if not hasattr(cfg, 'MODEL'):
+            cfg.MODEL = CN()
+            cfg.MODEL.MULTI_TEMPLATE = True
+            cfg.MODEL.FUSION_METHOD = 'attention'
+            cfg.MODEL.NUM_TEMPLATES = 3
     
     # Create dataset
     try:
