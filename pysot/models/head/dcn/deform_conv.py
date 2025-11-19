@@ -33,7 +33,8 @@ class DeformConvFunction(Function):
         ctx.deformable_groups = deformable_groups
         ctx.im2col_step = im2col_step
 
-        ctx.save_for_backward(input, offset, weight)
+        # Save contiguous versions for backward
+        ctx.save_for_backward(input.contiguous(), offset.contiguous(), weight.contiguous())
 
         output = input.new_empty(
             DeformConvFunction._output_size(input, weight, ctx.padding,
@@ -44,6 +45,11 @@ class DeformConvFunction(Function):
         if not input.is_cuda:
             raise NotImplementedError
         else:
+            # Ensure input tensors are contiguous before forward pass
+            input = input.contiguous()
+            offset = offset.contiguous()
+            weight = weight.contiguous()
+            
             cur_im2col_step = min(ctx.im2col_step, input.shape[0])
             assert (input.shape[0] %
                     cur_im2col_step) == 0, 'im2col step must divide batchsize'
@@ -79,6 +85,9 @@ class DeformConvFunction(Function):
             if ctx.needs_input_grad[0] or ctx.needs_input_grad[1]:
                 grad_input = torch.zeros_like(input)
                 grad_offset = torch.zeros_like(offset)
+                # Recreate buffer to ensure it is contiguous
+                # Buffer is resized in CUDA code, so we need a fresh one
+                ctx.bufs_[0] = input.new_empty(0).contiguous()
                 deform_conv_cuda.deform_conv_backward_input_cuda(
                     input, offset, grad_output, grad_input,
                     grad_offset, weight, ctx.bufs_[0], weight.size(3),
@@ -89,6 +98,10 @@ class DeformConvFunction(Function):
 
             if ctx.needs_input_grad[2]:
                 grad_weight = torch.zeros_like(weight)
+                # Recreate buffers to ensure they are contiguous
+                # Buffers are resized in CUDA code, so we need fresh ones
+                ctx.bufs_[0] = input.new_empty(0).contiguous()
+                ctx.bufs_[1] = input.new_empty(0).contiguous()
                 deform_conv_cuda.deform_conv_backward_parameters_cuda(
                     input, offset, grad_output,
                     grad_weight, ctx.bufs_[0], ctx.bufs_[1], weight.size(3),
