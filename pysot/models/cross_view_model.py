@@ -113,10 +113,16 @@ class CrossViewModelBuilder(nn.Module):
             # Extract features for each template
             zf_list = []
             for z in z_list:
-                zf = self.backbone(z)
-                if cfg.ADJUST.ADJUST:
-                    zf[2:] = self.neck(zf[2:])
-                zf_list.append(zf)
+            zf = self.backbone(z)
+            if cfg.ADJUST.ADJUST:
+                # Adjust neck for levels 2,3,4
+                zf_adjusted = self.neck(zf[2:])
+                # Reconstruct full feature list
+                if isinstance(zf, (list, tuple)):
+                    zf = list(zf[:2]) + list(zf_adjusted)
+                else:
+                    zf = [zf] + list(zf_adjusted) if isinstance(zf_adjusted, (list, tuple)) else [zf, zf_adjusted]
+            zf_list.append(zf)
             
             # Fuse templates
             zf_fused = self.multi_template_fusion(zf_list)
@@ -131,13 +137,43 @@ class CrossViewModelBuilder(nn.Module):
         with torch.no_grad():
             xf = self.backbone(x)
             if cfg.ADJUST.ADJUST:
-                xf[2:] = self.neck(xf[2:])
+                # Adjust neck for levels 2,3,4
+                xf_adjusted = self.neck(xf[2:])
+                # Reconstruct full feature list
+                if isinstance(xf, (list, tuple)):
+                    xf = list(xf[:2]) + list(xf_adjusted)
+                else:
+                    xf = [xf] + list(xf_adjusted) if isinstance(xf_adjusted, (list, tuple)) else [xf, xf_adjusted]
 
-            zf, xf[2:] = self.feature_enhance(self.zf[2:], xf[2:])
-            cls, loc = self.rpn_head(zf, xf[2:])
-            enhanced_zf = self.zf[:2] + zf
+            # Ensure self.zf and xf are lists
+            if not isinstance(self.zf, (list, tuple)):
+                zf_list = [self.zf]
+            else:
+                zf_list = self.zf
+            if not isinstance(xf, (list, tuple)):
+                xf_list = [xf]
+            else:
+                xf_list = xf
+
+            # FeatureEnhance expects list of features (levels 2,3,4)
+            zf_enhanced_list, xf_enhanced_list = self.feature_enhance(zf_list[2:], xf_list[2:])
+            cls, loc = self.rpn_head(zf_enhanced_list, xf_enhanced_list)
+            
+            # Combine for mask head if needed
             if cfg.MASK.MASK:
-                self.b_fused_features, self.m_fused_features = self.feature_fusion(enhanced_zf, xf)
+                # Ensure both are lists for FeatureFusionNeck
+                # enhanced_zf should be [level0, level1, level2_enhanced, level3_enhanced, level4_enhanced]
+                if isinstance(self.zf, (list, tuple)):
+                    enhanced_zf = list(self.zf[:2]) + list(zf_enhanced_list)
+                else:
+                    enhanced_zf = [self.zf] + list(zf_enhanced_list) if isinstance(zf_enhanced_list, (list, tuple)) else [self.zf, zf_enhanced_list]
+                
+                if not isinstance(xf, (list, tuple)):
+                    xf_list = [xf]
+                else:
+                    xf_list = xf
+                
+                self.b_fused_features, self.m_fused_features = self.feature_fusion(enhanced_zf, xf_list)
             return {
                 'cls': cls,
                 'loc': loc
@@ -191,18 +227,53 @@ class CrossViewModelBuilder(nn.Module):
         for template in template_list:
             zf = self.backbone(template)
             if cfg.ADJUST.ADJUST:
-                zf[2:] = self.neck(zf[2:])
+                # Adjust neck for levels 2,3,4
+                zf_adjusted = self.neck(zf[2:])
+                # Reconstruct full feature list
+                if isinstance(zf, (list, tuple)):
+                    zf = list(zf[:2]) + list(zf_adjusted)
+                else:
+                    zf = [zf] + list(zf_adjusted) if isinstance(zf_adjusted, (list, tuple)) else [zf, zf_adjusted]
             zf_list.append(zf)
 
         # Fuse multi-template features
-        zf_fused = self.multi_template_fusion(zf_list)
+        # Only fuse levels 2,3,4 (after neck adjustment, all have 256 channels)
+        # Keep levels 0,1 unchanged or use simple fusion
+        if isinstance(zf_list[0], (list, tuple)):
+            # Multi-level features
+            zf_fused = []
+            # Keep first 2 levels unchanged (or use simple mean fusion)
+            for level_idx in range(2):
+                level_features = [zf[level_idx] for zf in zf_list]
+                # Simple mean fusion for early levels
+                zf_fused.append(torch.stack(level_features, dim=0).mean(dim=0))
+            
+            # Fuse levels 2,3,4 (after neck, all 256 channels)
+            levels_to_fuse = [zf[2:] for zf in zf_list]  # Extract levels 2,3,4
+            fused_levels = self.multi_template_fusion(levels_to_fuse)
+            zf_fused.extend(fused_levels)
+        else:
+            # Single level - should not happen with ResNet
+            zf_fused = self.multi_template_fusion(zf_list)
 
         # Extract search features
         xf = self.backbone(search)
         if cfg.ADJUST.ADJUST:
-            xf[2:] = self.neck(xf[2:])
+            # Adjust neck for levels 2,3,4
+            xf_adjusted = self.neck(xf[2:])
+            # Reconstruct full feature list
+            if isinstance(xf, (list, tuple)):
+                xf = list(xf[:2]) + list(xf_adjusted)
+            else:
+                xf = [xf] + list(xf_adjusted) if isinstance(xf_adjusted, (list, tuple)) else [xf, xf_adjusted]
 
         # Feature enhancement với deformable attention
+        # Ensure zf_fused and xf are lists
+        if not isinstance(zf_fused, (list, tuple)):
+            zf_fused = [zf_fused]
+        if not isinstance(xf, (list, tuple)):
+            xf = [xf]
+        
         zf_enhanced, xf_enhanced = self.feature_enhance(zf_fused[2:], xf[2:])
         
         # RPN
@@ -243,7 +314,18 @@ class CrossViewModelBuilder(nn.Module):
                 rois = torch.cat((batch_inds, torch.stack(select_roi_list).view(-1, 4)), dim=1)
 
                 # Combine fused template features với search features
-                enhanced_zf = zf_fused[:2] + zf_enhanced
+                # zf_fused[:2] là levels 0,1 (mean fused), zf_enhanced là levels 2,3,4 (enhanced)
+                # Ensure both are lists
+                if isinstance(zf_fused, (list, tuple)):
+                    enhanced_zf = list(zf_fused[:2]) + list(zf_enhanced)
+                else:
+                    # Should not happen, but handle gracefully
+                    enhanced_zf = [zf_fused] + list(zf_enhanced) if isinstance(zf_enhanced, (list, tuple)) else [zf_fused, zf_enhanced]
+                
+                # Ensure xf is also a list
+                if not isinstance(xf, (list, tuple)):
+                    xf = [xf]
+                
                 b_fused_features, m_fused_features = self.feature_fusion(enhanced_zf, xf)
                 
                 bbox_pred = self.bbox_head(b_fused_features, rois)

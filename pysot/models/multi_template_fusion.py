@@ -66,25 +66,47 @@ class MultiTemplateFusion(nn.Module):
         Args:
             zf_list: List of feature maps, mỗi element là [B, C, H, W]
                     hoặc nếu là multi-level features, mỗi element là list of features
+                    (assumed to be levels 2,3,4 with 256 channels each after neck)
         
         Returns:
             zf_fused: Fused feature map [B, C, H, W] hoặc list of fused features
         """
-        # Check if multi-level features
+        # Check if multi-level features (list of lists)
         if isinstance(zf_list[0], (list, tuple)):
-            # Multi-level features: zf_list[i] là list of features cho level i
+            # Multi-level features: zf_list[i] là list of features cho template i
+            # Each zf_list[i] should be [level2, level3, level4] with 256 channels
             num_levels = len(zf_list[0])
             fused_list = []
             
             for level_idx in range(num_levels):
                 level_features = [zf[level_idx] for zf in zf_list]
-                fused = self._fuse_single_level(level_features)
+                # Verify all have same channels (should be 256 after neck)
+                channels = [f.shape[1] for f in level_features]
+                if len(set(channels)) > 1:
+                    raise ValueError(f"Level {level_idx} has inconsistent channels: {channels}")
+                
+                # Only use attention fusion if channels match expected (256)
+                if channels[0] == self.in_channels:
+                    fused = self._fuse_single_level(level_features)
+                else:
+                    # Fallback to mean for other channels
+                    fused = torch.stack(level_features, dim=0).mean(dim=0)
+                
                 fused_list.append(fused)
             
             return fused_list
         else:
-            # Single level features
-            return self._fuse_single_level(zf_list)
+            # Single level features - should all have same channels
+            channels = [f.shape[1] for f in zf_list]
+            if len(set(channels)) > 1:
+                raise ValueError(f"Inconsistent channels: {channels}")
+            
+            # Only use attention if channels match
+            if channels[0] == self.in_channels:
+                return self._fuse_single_level(zf_list)
+            else:
+                # Fallback to mean
+                return torch.stack(zf_list, dim=0).mean(dim=0)
     
     def _fuse_single_level(self, zf_list):
         """Fuse features at single level"""
