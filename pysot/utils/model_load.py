@@ -64,12 +64,37 @@ def load_pretrain(model, pretrained_path):
         pretrained_dict = new_dict
         check_keys(model, pretrained_dict)
     
-    # Move pretrained_dict to model's device
-    model_device = next(model.parameters()).device
-    pretrained_dict = {k: v.to(model_device) if isinstance(v, torch.Tensor) else v 
-                       for k, v in pretrained_dict.items()}
+    # Filter out mismatched keys (e.g., downsample layers with different kernel sizes)
+    model_state_dict = model.state_dict()
+    filtered_dict = {}
+    skipped_keys = []
     
-    model.load_state_dict(pretrained_dict, strict=False)
+    for k, v in pretrained_dict.items():
+        if k in model_state_dict:
+            model_shape = model_state_dict[k].shape
+            pretrained_shape = v.shape
+            
+            if model_shape == pretrained_shape:
+                filtered_dict[k] = v
+            else:
+                skipped_keys.append(f"{k}: checkpoint {pretrained_shape} vs model {model_shape}")
+        else:
+            skipped_keys.append(f"{k}: not in model")
+    
+    if skipped_keys:
+        logger.info(f'[Warning] Skipped {len(skipped_keys)} keys due to shape mismatch or missing:')
+        for key in skipped_keys[:10]:  # Show first 10
+            logger.info(f'  {key}')
+        if len(skipped_keys) > 10:
+            logger.info(f'  ... and {len(skipped_keys) - 10} more')
+    
+    # Move filtered_dict to model's device
+    model_device = next(model.parameters()).device
+    filtered_dict = {k: v.to(model_device) if isinstance(v, torch.Tensor) else v 
+                     for k, v in filtered_dict.items()}
+    
+    model.load_state_dict(filtered_dict, strict=False)
+    logger.info(f'Loaded {len(filtered_dict)}/{len(pretrained_dict)} parameters from pretrained model')
     return model
 
 
