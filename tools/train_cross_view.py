@@ -331,6 +331,8 @@ def train(train_loader, model, optimizer, lr_scheduler, tb_writer):
 
 
 def main():
+    # Initialize distributed training (or single GPU)
+    # dist_init() will automatically handle single GPU case
     rank, world_size = dist_init()
     logger.info("init done")
 

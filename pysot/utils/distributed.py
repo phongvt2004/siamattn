@@ -100,10 +100,18 @@ def _get_local_ip():
 
 def dist_init():
     global rank, world_size, inited
+    # Check if RANK is set (distributed training)
+    if 'RANK' not in os.environ:
+        # Single GPU training
+        logger.info('RANK not set, using single process (single GPU training)')
+        rank, world_size = 0, 1
+        inited = True
+        return rank, world_size
+    
     try:
         rank, world_size = _dist_init()
     except RuntimeError as e:
-        if 'public' in e.args[0]:
+        if 'public' in str(e):
             logger.info(e)
             logger.info('Warning: use single process')
             rank, world_size = 0, 1
