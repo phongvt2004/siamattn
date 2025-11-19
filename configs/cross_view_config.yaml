@@ -1,0 +1,170 @@
+META_ARC: "cross_view_siamrpn_r50"
+
+CUDA: True
+
+# ------------------------------------------------------------------------ #
+# Training options
+# ------------------------------------------------------------------------ #
+TRAIN:
+  # Anchor Target
+  THR_HIGH: 0.6
+  THR_LOW: 0.3
+  NEG_NUM: 16
+  POS_NUM: 16
+  TOTAL_NUM: 64
+
+  EXEMPLAR_SIZE: 127
+  SEARCH_SIZE: 255
+  BASE_SIZE: 8
+  OUTPUT_SIZE: 25
+
+  RESUME: ''
+  PRETRAINED: ''
+  LOG_DIR: './logs/cross_view'
+  SNAPSHOT_DIR: './snapshot/cross_view'
+
+  EPOCH: 50
+  START_EPOCH: 0
+  BATCH_SIZE: 8  # Smaller vì có 3 templates
+  NUM_WORKERS: 4
+  MOMENTUM: 0.9
+  WEIGHT_DECAY: 0.0001
+
+  CLS_WEIGHT: 1.0
+  LOC_WEIGHT: 1.2
+  MASK_WEIGHT: 0.4
+  BBOX_WEIGHT: 1.0
+
+  PRINT_FREQ: 20
+  LOG_GRADS: False
+  GRAD_CLIP: 10.0
+
+  BASE_LR: 0.001  # Lower learning rate cho cross-view
+
+  LR:
+    TYPE: 'log'
+    KWARGS: {}
+
+  LR_WARMUP:
+    WARMUP: True
+    TYPE: 'step'
+    EPOCH: 5
+    KWARGS: {}
+
+  ROIPOOL_OUTSIZE: 16
+  ROI_PER_IMG: 16
+  FG_FRACTION: 1
+  FG_THRESH: 0.5
+  BG_THRESH_HIGH: 0.5
+  BG_THRESH_LOW: 0.0
+
+  BBOX_NORMALIZE_TARGETS_PRECOMPUTED: True
+  BBOX_NORMALIZE_MEANS: [0.0, 0.0, 0.0, 0.0]
+  BBOX_NORMALIZE_STDS: [0.1, 0.1, 0.2, 0.2]
+
+# ------------------------------------------------------------------------ #
+# Dataset options
+# ------------------------------------------------------------------------ #
+DATASET:
+  # Augmentation for template (ground images)
+  TEMPLATE:
+    SHIFT: 4
+    SCALE: 0.05
+    BLUR: 0.0
+    FLIP: 0.0  # Không flip cho ground images
+    COLOR: 0.5
+    EXTRA_AUG: 0.0
+
+  # Augmentation for search (drone images)
+  SEARCH:
+    SHIFT: 64
+    SCALE: 0.18
+    BLUR: 0.2
+    FLIP: 0.2
+    COLOR: 0.5
+    EXTRA_AUG: 0.5
+
+  # Sample Negative pair
+  NEG: 0.2
+  GRAY: 0.0
+
+  # Observing dataset
+  OBSERVING:
+    ROOT: 'training_dataset/observing/train/samples'
+    ANNO: 'training_dataset/observing/train/annotations/annotations.json'
+    NUM_USE: -1  # Use all
+
+# ------------------------------------------------------------------------ #
+# Model options
+# ------------------------------------------------------------------------ #
+MODEL:
+  MULTI_TEMPLATE: True
+  FUSION_METHOD: 'attention'  # 'max', 'mean', 'attention', 'self_attention_then_fusion', 'learned_weight'
+  NUM_TEMPLATES: 3
+
+# ------------------------------------------------------------------------ #
+# Backbone options
+# ------------------------------------------------------------------------ #
+BACKBONE:
+  TYPE: 'resnet50'
+  KWARGS: {}
+  PRETRAINED: 'pretrained_models/resnet50.model'  # Path to pretrained ResNet-50
+  TRAIN_LAYERS: ['layer2', 'layer3', 'layer4']
+  LAYERS_LR: 0.1
+  TRAIN_EPOCH: 10  # Start training backbone từ epoch 10
+
+# ------------------------------------------------------------------------ #
+# Adjust layer options
+# ------------------------------------------------------------------------ #
+ADJUST:
+  ADJUST: True
+  TYPE: "AdjustAllLayer"
+  KWARGS: {}
+
+# ------------------------------------------------------------------------ #
+# RPN options
+# ------------------------------------------------------------------------ #
+RPN:
+  TYPE: 'MultiRPN'
+  KWARGS: {}
+
+# ------------------------------------------------------------------------ #
+# Mask options
+# ------------------------------------------------------------------------ #
+MASK:
+  MASK: False  # Set True nếu muốn train với mask
+  TYPE: "MaskCorr"
+  KWARGS: {}
+  MASK_OUTSIZE: 64
+
+REFINE:
+  REFINE: False
+  TYPE: "Refine"
+
+# ------------------------------------------------------------------------ #
+# Anchor options
+# ------------------------------------------------------------------------ #
+ANCHOR:
+  STRIDE: 8
+  RATIOS: [0.33, 0.5, 1, 2, 3]
+  SCALES: [8]
+  ANCHOR_NUM: 5  # len(RATIOS) * len(SCALES)
+
+# ------------------------------------------------------------------------ #
+# Tracker options (for inference)
+# ------------------------------------------------------------------------ #
+TRACK:
+  TYPE: 'SiamRPNTracker'
+  PENALTY_K: 0.04
+  WINDOW_INFLUENCE: 0.44
+  LR: 0.4
+  EXEMPLAR_SIZE: 127
+  INSTANCE_SIZE: 255
+  BASE_SIZE: 8
+  CONTEXT_AMOUNT: 0.5
+  CONFIDENCE_HIGH: 0.998
+  LOST_INSTANCE_SIZE: 831
+  CONFIDENCE_LOW: 0.85
+  MASK_THERSHOLD: 0.30
+  MASK_OUTPUT_SIZE: 127
+

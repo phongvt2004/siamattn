@@ -109,3 +109,5 @@ pretrained
 
 *.swp
 *.swo
+
+training_dataset/observing
